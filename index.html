@@ -15,18 +15,19 @@
         .level { font-size: 3.2em; font-weight: 800; margin: 5px 0; color: #1a202c; }
         
         /* 3-Day Timeline */
-        .day-container { margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; }
+        .day-container { margin-bottom: 12px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; }
         .day-container:last-child { border: none; }
         .timeline { display: flex; justify-content: space-between; gap: 5px; margin-top: 8px; }
-        .time-slot { flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px; background: #f8fafc; font-size: 0.75em; border: 1px solid #e2e8f0; }
-        .time-label { font-weight: bold; font-size: 0.7em; opacity: 0.6; display: block; margin-bottom: 3px; }
+        .time-slot { flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px; background: #f8fafc; font-size: 0.7em; border: 1px solid #e2e8f0; }
+        .time-label { font-weight: bold; font-size: 0.8em; opacity: 0.6; display: block; margin-bottom: 2px; }
+        .wind-est { font-size: 0.9em; color: #4a5568; font-weight: bold; margin-top: 2px; }
 
         /* Fishing & Moon */
-        .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.85em; }
+        .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.85em; text-align: left; }
         .bait-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin: 2px; border: 1px solid #bee3f8; font-weight: bold; }
         .moon-box { text-align: center; background: #1a202c; color: white; padding: 12px; border-radius: 12px; margin-top: 15px; }
         
-        .status-pill { font-size: 0.65em; font-weight: bold; padding: 3px; border-radius: 4px; display: block; margin-top: 4px; text-transform: uppercase; }
+        .status-pill { font-size: 0.6em; font-weight: bold; padding: 2px; border-radius: 4px; display: block; margin-top: 3px; text-transform: uppercase; }
         .go { background: #e6fffa; color: #2c7a7b; }
         .caution { background: #fffaf0; color: #9c4221; }
         .stop { background: #fff5f5; color: #c53030; }
@@ -35,8 +36,7 @@
         #compass { width: 80px; height: 80px; border: 4px solid #007aff; border-radius: 50%; margin: 10px auto; position: relative; transition: transform 1s ease; }
         #arrow { width: 4px; height: 40px; background: #e53e3e; position: absolute; left: 38px; bottom: 50%; transform-origin: bottom center; }
         
-        .btn-link { display: block; text-align: center; background: #007aff; color: white; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 15px; font-size: 0.9em; transition: 0.2s; }
-        .btn-link:hover { background: #0056b3; }
+        .yt-link { display: block; text-align: center; background: #ff0000; color: white; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 15px; font-size: 0.85em; }
         .updated { font-size: 0.7em; opacity: 0.5; margin-bottom: 10px; text-align: center; }
         canvas { height: 180px !important; }
     </style>
@@ -44,17 +44,17 @@
 <body>
 
     <h1 style="text-align: center; color: #1a202c; margin-bottom: 5px;">Dean's Eagle Mountain Forecast</h1>
-    <div id="update-time" class="updated">Syncing with USGS...</div>
+    <div id="update-time" class="updated">Connecting to Sensors...</div>
 
     <div class="container">
         
         <div class="column">
             <div class="card">
                 <h3 id="season-title">🎣 Seasonal Fishing</h3>
-                <div id="fishing-report">Updating patterns...</div>
+                <div id="fishing-report"></div>
                 
-                <a href="https://tpwd.texas.gov/fishboat/fish/recreational/lakes/eagle_mountain/" target="_blank" class="btn-link">
-                    Full Fishing Report ↗
+                <a href="https://www.youtube.com/watch?v=ziHcb0oMf9g" target="_blank" class="yt-link">
+                    📺 Lake Patterns Video
                 </a>
 
                 <div class="moon-box">
@@ -68,13 +68,13 @@
 
         <div class="column">
             <div class="card" style="text-align: center;">
-                <div style="font-size: 0.7em; font-weight: bold; opacity: 0.6; letter-spacing: 1px;">SURFACE ELEVATION</div>
+                <div style="font-size: 0.7em; font-weight: bold; opacity: 0.6;">SURFACE ELEVATION</div>
                 <div id="lake-level" class="level">...</div>
-                <div id="lake-status" class="status-pill" style="display:inline-block; padding: 8px 25px; font-size: 0.8em;">Connecting...</div>
+                <div id="lake-status" class="status-pill" style="display:inline-block; padding: 8px 25px; font-size: 0.8em;">Syncing...</div>
             </div>
 
             <div class="card">
-                <h3>🚤 Boating Forecast (AM/PM/Night)</h3>
+                <h3>🚤 Boating Outlook & Wind</h3>
                 <div id="forecast-container"></div>
             </div>
 
@@ -111,13 +111,14 @@
 
         const seasonalFish = {
             spring: { title: "Spring Spawn", report: [
-                { n: "Largemouth Bass", p: "Up shallow on rock & wood.", b: ["Bladed Jigs", "Texas Rigs"] },
-                { n: "Crappie", p: "Spawning on dock posts.", b: ["Minnows", "Pink Jigs"] }
+                { n: "Largemouth Bass", p: "Pre-spawn. Hitting shallow cover.", b: ["Crankbaits", "Spinnerbaits"] },
+                { n: "Crappie", p: "Spawning on dock pilings.", b: ["Minnows", "Jigs"] },
+                { n: "White Bass", p: "Running the north river mouth.", b: ["Spoons", "Rooster Tails"] }
             ]}
         };
 
         function updateFishing() {
-            const d = seasonalFish.spring; // Hardcoded for March
+            const d = seasonalFish.spring;
             document.getElementById('season-title').innerText = "🎣 " + d.title;
             document.getElementById('fishing-report').innerHTML = d.report.map(f => `
                 <div class="fish-box"><strong>${f.n}</strong><br>${f.p}<br>
@@ -138,9 +139,9 @@
                 const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
                 const time = new Date(data.value.timeSeries[0].values[0].value[0].dateTime).toLocaleString([], {hour:'2-digit', minute:'2-digit', month:'short', day:'numeric'});
                 document.getElementById('lake-level').innerText = level.toFixed(2) + ' ft';
-                document.getElementById('update-time').innerText = "Last USGS Sync: " + time;
+                document.getElementById('update-time').innerText = "Last Updated: " + time;
                 const ls = document.getElementById('lake-status');
-                if (level > DANGER_LEVEL) { ls.innerText = "DOCK DEPTH: SAFE"; ls.className = "status-pill go"; }
+                if (level > DANGER_LEVEL) { ls.innerText = "DOCK IS SAFE"; ls.className = "status-pill go"; }
                 else { ls.innerText = "LAKE IS LOW"; ls.className = "status-pill stop"; }
             } catch (e) { }
         }
@@ -151,36 +152,35 @@
                 const data = await res.json();
                 const container = document.getElementById('forecast-container');
                 
-                // Wind UI
                 const now = data.properties.periods[0];
                 document.getElementById('wind-speed').innerText = now.windSpeed;
                 document.getElementById('wind-dir').innerText = "Wind from the " + now.windDirection;
                 const deg = { 'N':0,'NE':45,'E':90,'SE':135,'S':180,'SW':225,'W':270,'NW':315 }[now.windDirection] || 0;
                 document.getElementById('arrow').style.transform = `rotate(${deg}deg)`;
 
-                // Timeline logic: Show 3 Days (2 periods per day from NWS)
                 for (let day = 0; day < 3; day++) {
                     const am = data.properties.periods[day * 2];
                     const pm = data.properties.periods[day * 2 + 1];
 
                     const getStatus = (p) => {
-                        const wN = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                        const wStr = p.windSpeed;
+                        const wN = parseInt(wStr.match(/\d+/)) || 0;
                         const isW = ["W", "SW", "NW"].includes(p.windDirection);
-                        if (p.shortForecast.includes("Rain") || wN > 18) return { s:"stop", t:"In", i:"🏠" };
-                        if ((isW && wN > 10) || wN > 13) return { s:"caution", t:"Rough", i:"🌊" };
-                        return { s:"go", t:"Go", i:"🚤" };
+                        if (p.shortForecast.includes("Rain") || wN > 18) return { s:"stop", t:"In", i:"🏠", w: wStr };
+                        if ((isW && wN > 10) || wN > 13) return { s:"caution", t:"Rough", i:"🌊", w: wStr };
+                        return { s:"go", t:"Go", i:"🚤", w: wStr };
                     };
 
-                    const amStatus = getStatus(am);
-                    const pmStatus = getStatus(pm);
+                    const amS = getStatus(am);
+                    const pmS = getStatus(pm);
 
                     container.innerHTML += `
                         <div class="day-container">
                             <b style="font-size:0.85em; color:#007aff;">${am.name.split(' ')[0]}</b>
                             <div class="timeline">
-                                <div class="time-slot"><span class="time-label">MORNING</span>${amStatus.i} ${am.temperature}°<span class="status-pill ${amStatus.s}">${amStatus.t}</span></div>
-                                <div class="time-slot"><span class="time-label">AFTERNOON</span>${pmStatus.i} ${pm.temperature}°<span class="status-pill ${pmStatus.s}">${pmStatus.t}</span></div>
-                                <div class="time-slot" style="opacity:0.6;"><span class="time-label">NIGHT</span>🌙 ${pm.temperature - 10}°<span class="status-pill go">Calm</span></div>
+                                <div class="time-slot"><span class="time-label">MORNING</span>${amS.i}<div class="wind-est">${amS.w}</div><span class="status-pill ${amS.s}">${amS.t}</span></div>
+                                <div class="time-slot"><span class="time-label">AFTERNOON</span>${pmS.i}<div class="wind-est">${pmS.w}</div><span class="status-pill ${pmS.s}">${pmS.t}</span></div>
+                                <div class="time-slot" style="opacity:0.6;"><span class="time-label">NIGHT</span>🌙<div class="wind-est">Calm</div><span class="status-pill go">Go</span></div>
                             </div>
                         </div>`;
                 }
