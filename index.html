@@ -3,71 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eagle Mountain - Dad's Dashboard</title>
+    <title>Eagle Mountain - Dad's Master Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; text-align: center; background: #f0f4f8; padding: 20px; color: #2c3e50; }
-        .card { background: white; border-radius: 20px; padding: 20px; margin: 12px auto; max-width: 450px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); border: 1px solid #d1d9e6; }
+        body { font-family: -apple-system, sans-serif; text-align: center; background: #f0f4f8; padding: 15px; color: #2c3e50; line-height: 1.4; }
+        .card { background: white; border-radius: 20px; padding: 20px; margin: 10px auto; max-width: 500px; box-shadow: 0 8px 20px rgba(0,0,0,0.06); border: 1px solid #d1d9e6; }
         .level { font-size: 3em; font-weight: 800; color: #007aff; margin: 5px 0; }
-        .status { font-weight: bold; padding: 12px; border-radius: 10px; margin-top: 10px; text-transform: uppercase; font-size: 0.85em; }
-        .safe { background: #e6fffa; color: #2c7a7b; border: 1px solid #81e6d9; }
-        .warning { background: #fffaf0; color: #9c4221; border: 1px solid #fbd38d; }
-        .danger { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
-        .destination-title { font-weight: bold; color: #2d3748; margin-top: 10px; display: block; }
-        .destination-box { background: #edf2f7; border-radius: 10px; padding: 15px; margin-top: 10px; font-size: 0.9em; text-align: left; }
-        .timestamp { font-size: 0.7em; opacity: 0.5; margin-bottom: 10px; }
-        hr { border: 0; border-top: 1px solid #edf2f7; margin: 12px 0; }
+        .forecast-grid { display: flex; justify-content: space-between; gap: 8px; margin-top: 10px; }
+        .day-card { flex: 1; padding: 10px; border-radius: 12px; font-size: 0.8em; border: 1px solid #eee; background: #fff; }
+        .status { font-weight: bold; padding: 8px; border-radius: 6px; margin-top: 5px; text-transform: uppercase; font-size: 0.7em; }
+        .go { background: #e6fffa; color: #2c7a7b; }
+        .caution { background: #fffaf0; color: #9c4221; }
+        .stop { background: #fff5f5; color: #c53030; }
+        .timestamp { font-size: 0.7em; opacity: 0.5; margin-bottom: 8px; }
+        canvas { max-width: 100%; height: 250px !important; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <h2 style="margin-bottom: 2px;">Eagle Mountain Lake</h2>
-    <div id="update-time" class="timestamp">Syncing...</div>
+    <div id="update-time" class="timestamp">Updating...</div>
 
     <div class="card">
-        <div id="boating-icon" style="font-size: 3em;">🚤</div>
-        <div id="boating-text" style="font-weight: bold; font-size: 1.2em; margin-top: 5px;">Analyzing Conditions...</div>
-        <div id="boating-status" class="status">Loading weather...</div>
-    </div>
-
-    <div class="card">
-        <div style="font-size: 0.75em; font-weight: bold; opacity: 0.6; letter-spacing: 1px;">SURFACE ELEVATION</div>
+        <div style="font-size: 0.7em; font-weight: bold; opacity: 0.6;">SURFACE ELEVATION</div>
         <div id="lake-level" class="level">...</div>
         <div id="lake-status" class="status">Connecting...</div>
     </div>
 
     <div class="card">
-        <span class="destination-title">📍 Recommended Spot Today</span>
-        <div id="destination-guide" class="destination-box">
-            Determining best location based on wind fetch...
-        </div>
+        <div style="font-size: 0.8em; font-weight: bold; margin-bottom: 10px;">3-DAY BOATING OUTLOOK</div>
+        <div class="forecast-grid" id="forecast-container"></div>
+    </div>
+
+    <div class="card">
+        <div style="font-size: 0.8em; font-weight: bold;">30-DAY DEPTH COMPARISON</div>
+        <div style="font-size: 0.65em; opacity: 0.7; margin-bottom: 10px;">Current vs. Last Year</div>
+        <canvas id="depthChart"></canvas>
     </div>
 
     <script>
         const DANGER_LEVEL = 644.5; 
+        const SITE_ID = '08045000';
 
         async function init() {
             await getLakeData();
             await getWeatherData();
+            await renderChart();
         }
 
         async function getLakeData() {
             try {
-                const url = 'https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08045000&parameterCd=62615';
+                const url = `https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${SITE_ID}&parameterCd=62615`;
                 const response = await fetch(url);
                 const data = await response.json();
                 const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
-                const time = new Date(data.value.timeSeries[0].values[0].value[0].dateTime).toLocaleString([], {hour: '2-digit', minute:'2-digit'});
-
                 document.getElementById('lake-level').innerText = level.toFixed(2) + ' ft';
-                document.getElementById('update-time').innerText = "Last Updated: " + time;
-
+                
                 const lStatus = document.getElementById('lake-status');
                 if (level > DANGER_LEVEL + 0.8) {
-                    lStatus.innerText = "✅ Depth is Safe"; lStatus.className = "status safe";
+                    lStatus.innerText = "✅ Depth is Safe"; lStatus.className = "status go";
                 } else if (level > DANGER_LEVEL) {
-                    lStatus.innerText = "⚠️ Water is Low"; lStatus.className = "status warning";
+                    lStatus.innerText = "⚠️ Water is Low"; lStatus.className = "status caution";
                 } else {
-                    lStatus.innerText = "🚨 TOO SHALLOW"; lStatus.className = "status danger";
+                    lStatus.innerText = "🚨 TOO SHALLOW"; lStatus.className = "status stop";
                 }
             } catch (e) { document.getElementById('lake-level').innerText = "OFFLINE"; }
         }
@@ -76,46 +74,74 @@
             try {
                 const response = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast');
                 const data = await response.json();
-                const today = data.properties.periods[0];
-                
-                const windDir = today.windDirection;
-                const windNum = parseInt(today.windSpeed.match(/\d+/)) || 0;
-                const isWest = ["W", "SW", "NW"].includes(windDir);
-                const isRainy = today.shortForecast.toLowerCase().includes("rain") || today.shortForecast.toLowerCase().includes("storm");
-                
-                const bIcon = document.getElementById('boating-icon');
-                const bText = document.getElementById('boating-text');
-                const bStatus = document.getElementById('boating-status');
-                const dGuide = document.getElementById('destination-guide');
+                const container = document.getElementById('forecast-container');
+                const periods = [data.properties.periods[0], data.properties.periods[2], data.properties.periods[4]];
 
-                // 1. SET STATUS
-                if (isRainy || windNum > 20) {
-                    bIcon.innerText = "🏠"; bText.innerText = "Stay at the House";
-                    bStatus.innerText = isRainy ? "Storms Forecasted" : "Danger: High Winds";
-                    bStatus.className = "status danger";
-                } else if (isWest && windNum >= 10) {
-                    bIcon.innerText = "🌊"; bText.innerText = "Rough on East Shore";
-                    bStatus.innerText = `West Wind ${today.windSpeed}`;
-                    bStatus.className = "status warning";
-                } else {
-                    bIcon.innerText = "🚤"; bText.innerText = "Good for Boating";
-                    bStatus.innerText = "Conditions look clear";
-                    bStatus.className = "status safe";
-                }
+                periods.forEach(p => {
+                    const windNum = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                    const isWest = ["W", "SW", "NW"].includes(p.windDirection);
+                    const isRainy = p.shortForecast.toLowerCase().includes("rain") || p.shortForecast.toLowerCase().includes("storm");
 
-                // 2. SET DESTINATION GUIDE
-                if (isWest) {
-                    dGuide.innerHTML = "<b>West Bay / Twin Points:</b> Head across the lake to the west side. The hills will block the wind and keep the water calm for the jet skis.";
-                } else if (windDir === "S" || windDir === "SE") {
-                    dGuide.innerHTML = "<b>Upper Lake / Coves:</b> South winds make the main body choppy. Head north toward the quieter coves or the 'Party Cove' area for smoother water.";
-                } else if (windDir === "N" || windDir === "NE") {
-                    dGuide.innerHTML = "<b>Dam Area / South End:</b> North winds blow straight down the lake. The southern end near the dam or the southern-facing coves will be most protected.";
-                } else {
-                    dGuide.innerHTML = "<b>East Shore (Your Dock):</b> With light or East winds, your side of the lake is perfect today. Enjoy the calm water!";
-                }
+                    let sClass = "go", sText = "Good", icon = "🚤";
+                    if (isRainy || windNum > 20) { sClass = "stop"; sText = "Stay In"; icon = "🏠"; }
+                    else if ((isWest && windNum >= 10) || windNum > 13) { sClass = "caution"; sText = "Rough"; icon = "🌊"; }
 
-            } catch (e) { document.getElementById('boating-status').innerText = "Weather Sync Failed"; }
+                    container.innerHTML += `
+                        <div class="day-card">
+                            <span style="font-weight:bold">${p.name}</span>
+                            <div style="font-size:1.5em; margin:5px 0;">${icon}</div>
+                            <div class="status ${sClass}">${sText}</div>
+                            <div style="margin-top:5px"><b>${p.temperature}°F</b></div>
+                            <div style="font-size:0.8em">${p.windDirection} ${p.windSpeed}</div>
+                        </div>`;
+                });
+            } catch (e) { container.innerText = "Weather Failed"; }
         }
+
+        async function fetchHistory(startDate, endDate) {
+            const url = `https://waterservices.usgs.gov/nwis/dv/?format=json&sites=${SITE_ID}&startDT=${startDate}&endDT=${endDate}&parameterCd=62615`;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data.value.timeSeries[0].values[0].value.map(v => parseFloat(v.value));
+        }
+
+        async function renderChart() {
+            const ctx = document.getElementById('depthChart').getContext('2d');
+            const now = new Date();
+            const lastYear = new Date(); lastYear.setFullYear(now.getFullYear() - 1);
+            
+            // Format dates YYYY-MM-DD
+            const fmt = (d) => d.toISOString().split('T')[0];
+            const startNow = new Date(); startNow.setDate(now.getDate() - 30);
+            const startLY = new Date(lastYear); startLY.setDate(lastYear.getDate() - 30);
+
+            try {
+                const data2026 = await fetchHistory(fmt(startNow), fmt(now));
+                const data2025 = await fetchHistory(fmt(startLY), fmt(lastYear));
+                
+                const labels = Array.from({length: 30}, (_, i) => 30 - i + " days ago").reverse();
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            { label: '2026 (Now)', data: data2026, borderColor: '#007aff', backgroundColor: '#007aff22', fill: true, tension: 0.3 },
+                            { label: '2025 (Last Year)', data: data2025, borderColor: '#ccc', borderDash: [5, 5], fill: false, tension: 0.3 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+                        scales: { 
+                            y: { beginAtZero: false, ticks: { font: { size: 10 } } },
+                            x: { display: false }
+                        }
+                    }
+                });
+            } catch (e) { console.error("Chart failed", e); }
+        }
+
         init();
     </script>
 </body>
