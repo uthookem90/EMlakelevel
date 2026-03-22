@@ -7,30 +7,36 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f4f8; margin: 0; padding: 15px; color: #2c3e50; }
-        .container { display: grid; grid-template-columns: 1.3fr 2fr 1.3fr; gap: 15px; max-width: 1250px; margin: 0 auto; }
-        @media (max-width: 950px) { .container { grid-template-columns: 1fr; } }
+        .container { display: grid; grid-template-columns: 1.3fr 2fr 1.3fr; gap: 15px; max-width: 1300px; margin: 0 auto; }
+        @media (max-width: 1000px) { .container { grid-template-columns: 1fr; } }
         
         .card { background: white; border-radius: 15px; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #d1d9e6; margin-bottom: 15px; }
         h3 { margin-top: 0; color: #007aff; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; font-size: 1.05em; text-transform: uppercase; letter-spacing: 0.5px; }
         .level { font-size: 3.2em; font-weight: 800; margin: 5px 0; color: #1a202c; }
         
+        /* 3-Day Timeline */
+        .day-container { margin-bottom: 15px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; }
+        .day-container:last-child { border: none; }
+        .timeline { display: flex; justify-content: space-between; gap: 5px; margin-top: 8px; }
+        .time-slot { flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px; background: #f8fafc; font-size: 0.75em; border: 1px solid #e2e8f0; }
+        .time-label { font-weight: bold; font-size: 0.7em; opacity: 0.6; display: block; margin-bottom: 3px; }
+
         /* Fishing & Moon */
         .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.85em; }
         .bait-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin: 2px; border: 1px solid #bee3f8; font-weight: bold; }
         .moon-box { text-align: center; background: #1a202c; color: white; padding: 12px; border-radius: 12px; margin-top: 15px; }
         
-        /* 3-Day Forecast */
-        .forecast-row { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
-        .day-box { flex: 1; text-align: center; padding: 12px 5px; border-radius: 10px; border: 1px solid #edf2f7; background: #fff; }
-        .status-pill { font-size: 0.65em; font-weight: bold; padding: 4px; border-radius: 4px; display: block; margin-top: 5px; text-transform: uppercase; }
+        .status-pill { font-size: 0.65em; font-weight: bold; padding: 3px; border-radius: 4px; display: block; margin-top: 4px; text-transform: uppercase; }
         .go { background: #e6fffa; color: #2c7a7b; }
         .caution { background: #fffaf0; color: #9c4221; }
         .stop { background: #fff5f5; color: #c53030; }
 
-        /* Wind Compass */
+        /* Compass */
         #compass { width: 80px; height: 80px; border: 4px solid #007aff; border-radius: 50%; margin: 10px auto; position: relative; transition: transform 1s ease; }
         #arrow { width: 4px; height: 40px; background: #e53e3e; position: absolute; left: 38px; bottom: 50%; transform-origin: bottom center; }
         
+        .btn-link { display: block; text-align: center; background: #007aff; color: white; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 15px; font-size: 0.9em; transition: 0.2s; }
+        .btn-link:hover { background: #0056b3; }
         .updated { font-size: 0.7em; opacity: 0.5; margin-bottom: 10px; text-align: center; }
         canvas { height: 180px !important; }
     </style>
@@ -47,6 +53,10 @@
                 <h3 id="season-title">🎣 Seasonal Fishing</h3>
                 <div id="fishing-report">Updating patterns...</div>
                 
+                <a href="https://tpwd.texas.gov/fishboat/fish/recreational/lakes/eagle_mountain/" target="_blank" class="btn-link">
+                    Full Fishing Report ↗
+                </a>
+
                 <div class="moon-box">
                     <div style="font-size: 0.65em; opacity: 0.8; margin-bottom: 3px;">LUNAR PHASE</div>
                     <div id="moon-icon" style="font-size: 2.2em;">🌒</div>
@@ -64,8 +74,8 @@
             </div>
 
             <div class="card">
-                <h3>🚤 3-Day Boating Outlook</h3>
-                <div id="forecast-container" class="forecast-row"></div>
+                <h3>🚤 Boating Forecast (AM/PM/Night)</h3>
+                <div id="forecast-container"></div>
             </div>
 
             <div class="card">
@@ -76,7 +86,7 @@
 
         <div class="column">
             <div class="card" style="text-align: center;">
-                <h3>💨 Live Wind</h3>
+                <h3>💨 Current Wind</h3>
                 <div id="compass"><div id="arrow"></div></div>
                 <div id="wind-speed" style="font-size: 1.3em; font-weight: 800; margin-top: 5px;">-- mph</div>
                 <div id="wind-dir" style="font-size: 0.8em; opacity: 0.6;">--</div>
@@ -102,18 +112,12 @@
         const seasonalFish = {
             spring: { title: "Spring Spawn", report: [
                 { n: "Largemouth Bass", p: "Up shallow on rock & wood.", b: ["Bladed Jigs", "Texas Rigs"] },
-                { n: "Crappie", p: "Spawning on dock posts.", b: ["Minnows", "Pink Jigs"] },
-                { n: "White Bass", p: "Running up the river north.", b: ["Small Spoons"] }
-            ]},
-            summer: { title: "Summer Heat", report: [{ n: "Catfish", p: "Deep water night bite.", b: ["Cut Shad"] }] },
-            fall: { title: "Fall Feed", report: [{ n: "Bass", p: "Chasing shad in coves.", b: ["Buzzbaits"] }] },
-            winter: { title: "Winter Hold", report: [{ n: "Blue Catfish", p: "Deep river channels.", b: ["Fresh Bait"] }] }
+                { n: "Crappie", p: "Spawning on dock posts.", b: ["Minnows", "Pink Jigs"] }
+            ]}
         };
 
         function updateFishing() {
-            const m = new Date().getMonth();
-            const s = (m>=2 && m<=4) ? "spring" : (m>=5 && m<=7) ? "summer" : (m>=8 && m<=10) ? "fall" : "winter";
-            const d = seasonalFish[s];
+            const d = seasonalFish.spring; // Hardcoded for March
             document.getElementById('season-title').innerText = "🎣 " + d.title;
             document.getElementById('fishing-report').innerHTML = d.report.map(f => `
                 <div class="fish-box"><strong>${f.n}</strong><br>${f.p}<br>
@@ -133,13 +137,12 @@
                 const data = await res.json();
                 const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
                 const time = new Date(data.value.timeSeries[0].values[0].value[0].dateTime).toLocaleString([], {hour:'2-digit', minute:'2-digit', month:'short', day:'numeric'});
-                
                 document.getElementById('lake-level').innerText = level.toFixed(2) + ' ft';
                 document.getElementById('update-time').innerText = "Last USGS Sync: " + time;
                 const ls = document.getElementById('lake-status');
                 if (level > DANGER_LEVEL) { ls.innerText = "DOCK DEPTH: SAFE"; ls.className = "status-pill go"; }
                 else { ls.innerText = "LAKE IS LOW"; ls.className = "status-pill stop"; }
-            } catch (e) { document.getElementById('lake-level').innerText = "ERROR"; }
+            } catch (e) { }
         }
 
         async function getWeatherData() {
@@ -148,27 +151,40 @@
                 const data = await res.json();
                 const container = document.getElementById('forecast-container');
                 
+                // Wind UI
                 const now = data.properties.periods[0];
                 document.getElementById('wind-speed').innerText = now.windSpeed;
                 document.getElementById('wind-dir').innerText = "Wind from the " + now.windDirection;
                 const deg = { 'N':0,'NE':45,'E':90,'SE':135,'S':180,'SW':225,'W':270,'NW':315 }[now.windDirection] || 0;
                 document.getElementById('arrow').style.transform = `rotate(${deg}deg)`;
 
-                [0, 2, 4].forEach(i => {
-                    const p = data.properties.periods[i];
-                    const wN = parseInt(p.windSpeed.match(/\d+/)) || 0;
-                    const isW = ["W", "SW", "NW"].includes(p.windDirection);
-                    let s="go", t="Good", ico="🚤";
-                    if (p.shortForecast.includes("Rain") || wN > 18) { s="stop"; t="Stay In"; ico="🏠"; }
-                    else if ((isW && wN > 10) || wN > 13) { s="caution"; t="Rough"; ico="🌊"; }
-                    
-                    container.innerHTML += `<div class="day-box">
-                        <b style="font-size:0.8em">${p.name}</b><br>
-                        <div style="font-size:1.4em; margin:4px 0;">${ico}</div>
-                        <span class="status-pill ${s}">${t}</span>
-                    </div>`;
-                });
-            } catch (e) {}
+                // Timeline logic: Show 3 Days (2 periods per day from NWS)
+                for (let day = 0; day < 3; day++) {
+                    const am = data.properties.periods[day * 2];
+                    const pm = data.properties.periods[day * 2 + 1];
+
+                    const getStatus = (p) => {
+                        const wN = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                        const isW = ["W", "SW", "NW"].includes(p.windDirection);
+                        if (p.shortForecast.includes("Rain") || wN > 18) return { s:"stop", t:"In", i:"🏠" };
+                        if ((isW && wN > 10) || wN > 13) return { s:"caution", t:"Rough", i:"🌊" };
+                        return { s:"go", t:"Go", i:"🚤" };
+                    };
+
+                    const amStatus = getStatus(am);
+                    const pmStatus = getStatus(pm);
+
+                    container.innerHTML += `
+                        <div class="day-container">
+                            <b style="font-size:0.85em; color:#007aff;">${am.name.split(' ')[0]}</b>
+                            <div class="timeline">
+                                <div class="time-slot"><span class="time-label">MORNING</span>${amStatus.i} ${am.temperature}°<span class="status-pill ${amStatus.s}">${amStatus.t}</span></div>
+                                <div class="time-slot"><span class="time-label">AFTERNOON</span>${pmStatus.i} ${pm.temperature}°<span class="status-pill ${pmStatus.s}">${pmStatus.t}</span></div>
+                                <div class="time-slot" style="opacity:0.6;"><span class="time-label">NIGHT</span>🌙 ${pm.temperature - 10}°<span class="status-pill go">Calm</span></div>
+                            </div>
+                        </div>`;
+                }
+            } catch (e) { }
         }
 
         async function renderChart() {
@@ -177,24 +193,12 @@
             const n = new Date(); const ly = new Date(); ly.setFullYear(n.getFullYear()-1);
             const sn = new Date(); sn.setDate(n.getDate()-30);
             const sl = new Date(ly); sl.setDate(ly.getDate()-30);
-
             const fetchH = async (s, e) => {
                 const r = await fetch(`https://waterservices.usgs.gov/nwis/dv/?format=json&sites=${SITE_ID}&startDT=${s}&endDT=${e}&parameterCd=62615`);
                 const d = await r.json(); return d.value.timeSeries[0].values[0].value.map(v => parseFloat(v.value));
             }
             const dN = await fetchH(fmt(sn), fmt(n)); const dL = await fetchH(fmt(sl), fmt(ly));
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: Array.from({length: 30}, (_, i) => 30-i),
-                    datasets: [
-                        { label: 'Now', data: dN, borderColor: '#007aff', backgroundColor: '#007aff11', fill: true, tension: 0.3 },
-                        { label: '2025', data: dL, borderColor: '#ccc', borderDash: [5,5], fill: false, tension: 0.3 }
-                    ]
-                },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { font: { size: 9 } } } } }
-            });
+            new Chart(ctx, { type: 'line', data: { labels: Array.from({length:30}, (_, i)=>30-i), datasets: [{ label: 'Now', data: dN, borderColor: '#007aff', backgroundColor: '#007aff11', fill: true, tension: 0.3 }, { label: '2025', data: dL, borderColor: '#ccc', borderDash: [5,5], fill: false, tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { font: { size: 9 } } } } } });
         }
         init();
     </script>
