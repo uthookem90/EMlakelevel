@@ -14,37 +14,26 @@
         h3 { margin-top: 0; color: #007aff; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; font-size: 1.05em; text-transform: uppercase; letter-spacing: 0.5px; }
         .level { font-size: 3.2em; font-weight: 800; margin: 5px 0; color: #1a202c; }
         
-        /* 3-Day Timeline */
-        .day-container { margin-bottom: 12px; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; }
-        .day-container:last-child { border: none; }
-        .timeline { display: flex; justify-content: space-between; gap: 5px; margin-top: 8px; }
-        .time-slot { flex: 1; text-align: center; padding: 8px 4px; border-radius: 8px; background: #f8fafc; font-size: 0.7em; border: 1px solid #e2e8f0; }
-        .time-label { font-weight: bold; font-size: 0.8em; opacity: 0.6; display: block; margin-bottom: 2px; }
-        .wind-est { font-size: 0.9em; color: #4a5568; font-weight: bold; margin-top: 2px; }
+        /* 24-Hour Wind List */
+        .hourly-wind { font-size: 0.85em; margin-top: 10px; max-height: 200px; overflow-y: auto; padding-right: 5px; }
+        .wind-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .wind-row:last-child { border: none; }
 
-        /* Fishing & Moon */
-        .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.85em; text-align: left; }
+        .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.85em; }
         .bait-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin: 2px; border: 1px solid #bee3f8; font-weight: bold; }
-        .moon-box { text-align: center; background: #1a202c; color: white; padding: 12px; border-radius: 12px; margin-top: 15px; }
         
-        .status-pill { font-size: 0.6em; font-weight: bold; padding: 2px; border-radius: 4px; display: block; margin-top: 3px; text-transform: uppercase; }
+        .status-pill { font-size: 0.65em; font-weight: bold; padding: 4px; border-radius: 4px; display: block; text-transform: uppercase; text-align: center; }
         .go { background: #e6fffa; color: #2c7a7b; }
-        .caution { background: #fffaf0; color: #9c4221; }
         .stop { background: #fff5f5; color: #c53030; }
 
-        /* Compass */
-        #compass { width: 80px; height: 80px; border: 4px solid #007aff; border-radius: 50%; margin: 10px auto; position: relative; transition: transform 1s ease; }
-        #arrow { width: 4px; height: 40px; background: #e53e3e; position: absolute; left: 38px; bottom: 50%; transform-origin: bottom center; }
-        
-        .yt-link { display: block; text-align: center; background: #ff0000; color: white; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 15px; font-size: 0.85em; }
-        .updated { font-size: 0.7em; opacity: 0.5; margin-bottom: 10px; text-align: center; }
-        canvas { height: 180px !important; }
+        .yt-btn { display: block; text-align: center; background: #ff0000; color: white; text-decoration: none; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 15px; font-size: 0.85em; }
+        .updated { font-size: 0.7em; opacity: 0.5; text-align: center; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <h1 style="text-align: center; color: #1a202c; margin-bottom: 5px;">Dean's Eagle Mountain Forecast</h1>
-    <div id="update-time" class="updated">Connecting to Sensors...</div>
+    <div id="update-time" class="updated">Syncing Lake Sensors...</div>
 
     <div class="container">
         
@@ -52,34 +41,22 @@
             <div class="card">
                 <h3 id="season-title">🎣 Seasonal Fishing</h3>
                 <div id="fishing-report"></div>
-                
-                <a href="https://www.youtube.com/watch?v=ziHcb0oMf9g" target="_blank" class="yt-link">
-                    📺 Lake Patterns Video
-                </a>
-
-                <div class="moon-box">
-                    <div style="font-size: 0.65em; opacity: 0.8; margin-bottom: 3px;">LUNAR PHASE</div>
-                    <div id="moon-icon" style="font-size: 2.2em;">🌒</div>
-                    <div id="moon-phase" style="font-weight: bold; font-size: 0.85em; margin-top: 5px;">Waxing Crescent</div>
-                    <div style="font-size: 0.65em; opacity: 0.7;">Best for: Night Catfishing</div>
-                </div>
+                <a href="https://www.youtube.com/watch?v=ziHcb0oMf9g" target="_blank" class="yt-btn">📺 Watch Lake Patterns</a>
             </div>
         </div>
 
         <div class="column">
             <div class="card" style="text-align: center;">
-                <div style="font-size: 0.7em; font-weight: bold; opacity: 0.6;">SURFACE ELEVATION</div>
                 <div id="lake-level" class="level">...</div>
-                <div id="lake-status" class="status-pill" style="display:inline-block; padding: 8px 25px; font-size: 0.8em;">Syncing...</div>
+                <div id="lake-status" class="status-pill" style="display:inline-block; padding: 8px 25px;">Checking...</div>
             </div>
 
             <div class="card">
-                <h3>🚤 Boating Outlook & Wind</h3>
+                <h3>🚤 Boating Outlook (AM/PM/Night)</h3>
                 <div id="forecast-container"></div>
             </div>
 
             <div class="card">
-                <h3>📈 30-Day Depth vs 2025</h3>
                 <canvas id="depthChart"></canvas>
             </div>
         </div>
@@ -87,120 +64,100 @@
         <div class="column">
             <div class="card" style="text-align: center;">
                 <h3>💨 Current Wind</h3>
-                <div id="compass"><div id="arrow"></div></div>
-                <div id="wind-speed" style="font-size: 1.3em; font-weight: 800; margin-top: 5px;">-- mph</div>
-                <div id="wind-dir" style="font-size: 0.8em; opacity: 0.6;">--</div>
+                <div id="wind-speed" style="font-size: 1.8em; font-weight: 800; color: #1a202c;">-- mph</div>
+                <div id="wind-dir" style="font-size: 0.85em; margin-bottom: 10px;">--</div>
+                <div id="wind-status" class="status-pill">--</div>
+                
+                <h4 style="font-size: 0.75em; margin: 20px 0 5px 0; color: #007aff; text-align: left; border-bottom: 1px solid #eef2f7;">24-HOUR WIND EST.</h4>
+                <div id="hourly-wind-list" class="hourly-wind"></div>
             </div>
             
             <div class="card" style="background: #2d3748; color: white; border: none;">
-                <h3 style="color: #63b3ed; border-bottom-color: #4a5568;">Dad's Log</h3>
-                <div style="font-size: 0.8em; line-height: 1.8;">
-                    📍 <b>Full Pool:</b> 649.10 ft<br>
-                    ⚠️ <b>Mud Line:</b> 644.50 ft<br>
-                    ⚓ <b>Safe Ramp:</b> Twin Points<br>
-                    🌊 <b>Fetch:</b> Rough with W/SW wind
+                <h3>Dad's Log</h3>
+                <div style="font-size: 0.85em; line-height: 1.8;">
+                    📍 Full Pool: 649.10 ft<br>
+                    ⚠️ Mud Line: 644.50 ft<br>
+                    ⚓ Safe Ramp: Twin Points
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
         const DANGER_LEVEL = 644.5;
-        const SITE_ID = '08045000';
+        const WIND_LIMIT = 12; // Dean's new limit
 
-        const seasonalFish = {
-            spring: { title: "Spring Spawn", report: [
-                { n: "Largemouth Bass", p: "Pre-spawn. Hitting shallow cover.", b: ["Crankbaits", "Spinnerbaits"] },
-                { n: "Crappie", p: "Spawning on dock pilings.", b: ["Minnows", "Jigs"] },
-                { n: "White Bass", p: "Running the north river mouth.", b: ["Spoons", "Rooster Tails"] }
-            ]}
-        };
+        async function getWeatherData() {
+            try {
+                const res = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast/hourly');
+                const data = await res.json();
+                const periods = data.properties.periods;
+
+                // Current Wind
+                const now = periods[0];
+                const curWind = parseInt(now.windSpeed.match(/\d+/)) || 0;
+                document.getElementById('wind-speed').innerText = now.windSpeed;
+                document.getElementById('wind-dir').innerText = "From " + now.windDirection;
+                
+                const ws = document.getElementById('wind-status');
+                if (curWind >= WIND_LIMIT) { ws.innerText = "STAY AT HOME"; ws.className = "status-pill stop"; }
+                else { ws.innerText = "SAFE TO BOAT"; ws.className = "status-pill go"; }
+
+                // 24 Hour Wind Forecast
+                let html = "";
+                for (let i = 1; i <= 24; i++) {
+                    const p = periods[i];
+                    const time = new Date(p.startTime).toLocaleTimeString([], { hour: 'numeric' });
+                    const val = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                    const color = val >= WIND_LIMIT ? 'color: #e53e3e; font-weight: bold;' : '';
+                    html += `<div class="wind-row"><span>${time}</span><span style="${color}">${p.windSpeed}</span></div>`;
+                }
+                document.getElementById('hourly-wind-list').innerHTML = html;
+
+                // Update Timeline (Daily)
+                const dayRes = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast');
+                const dayData = await dayRes.json();
+                let timelineHtml = "";
+                [0, 2, 4].forEach(i => {
+                    const p = dayData.properties.periods[i];
+                    const wVal = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                    const s = wVal >= WIND_LIMIT ? "stop" : "go";
+                    const t = wVal >= WIND_LIMIT ? "Stay Home" : "Go";
+                    timelineHtml += `<div style="margin-bottom:10px; border-bottom:1px solid #f1f5f9; padding-bottom:5px;">
+                        <b style="font-size:0.8em">${p.name}</b>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                            <span style="font-size:0.75em">${p.windSpeed}</span>
+                            <span class="status-pill ${s}" style="width:70px;">${t}</span>
+                        </div>
+                    </div>`;
+                });
+                document.getElementById('forecast-container').innerHTML = timelineHtml;
+            } catch (e) { }
+        }
 
         function updateFishing() {
-            const d = seasonalFish.spring;
-            document.getElementById('season-title').innerText = "🎣 " + d.title;
-            document.getElementById('fishing-report').innerHTML = d.report.map(f => `
+            const reports = [
+                { n: "Largemouth Bass", p: "Moving shallow. Rocks & reeds.", b: ["Crankbaits", "Jigs"] },
+                { n: "Crappie", p: "Spawning on dock pilings.", b: ["Minnows", "Pink Jigs"] },
+                { n: "White Bass", p: "Running up the north river.", b: ["Spoons"] }
+            ];
+            document.getElementById('fishing-report').innerHTML = reports.map(f => `
                 <div class="fish-box"><strong>${f.n}</strong><br>${f.p}<br>
                 ${f.b.map(bt => `<span class="bait-tag">${bt}</span>`).join('')}</div>`).join('');
         }
 
-        async function init() {
-            updateFishing();
-            await getLakeData();
-            await getWeatherData();
-            await renderChart();
-        }
-
         async function getLakeData() {
-            try {
-                const res = await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${SITE_ID}&parameterCd=62615`);
-                const data = await res.json();
-                const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
-                const time = new Date(data.value.timeSeries[0].values[0].value[0].dateTime).toLocaleString([], {hour:'2-digit', minute:'2-digit', month:'short', day:'numeric'});
-                document.getElementById('lake-level').innerText = level.toFixed(2) + ' ft';
-                document.getElementById('update-time').innerText = "Last Updated: " + time;
-                const ls = document.getElementById('lake-status');
-                if (level > DANGER_LEVEL) { ls.innerText = "DOCK IS SAFE"; ls.className = "status-pill go"; }
-                else { ls.innerText = "LAKE IS LOW"; ls.className = "status-pill stop"; }
-            } catch (e) { }
+            const res = await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08045000&parameterCd=62615`);
+            const data = await res.json();
+            const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
+            document.getElementById('lake-level').innerText = level.toFixed(2) + ' ft';
+            document.getElementById('update-time').innerText = "Last Updated: " + new Date().toLocaleTimeString();
+            const ls = document.getElementById('lake-status');
+            if (level > DANGER_LEVEL) { ls.innerText = "DOCK IS SAFE"; ls.className = "status-pill go"; }
+            else { ls.innerText = "LAKE IS LOW"; ls.className = "status-pill stop"; }
         }
 
-        async function getWeatherData() {
-            try {
-                const res = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast');
-                const data = await res.json();
-                const container = document.getElementById('forecast-container');
-                
-                const now = data.properties.periods[0];
-                document.getElementById('wind-speed').innerText = now.windSpeed;
-                document.getElementById('wind-dir').innerText = "Wind from the " + now.windDirection;
-                const deg = { 'N':0,'NE':45,'E':90,'SE':135,'S':180,'SW':225,'W':270,'NW':315 }[now.windDirection] || 0;
-                document.getElementById('arrow').style.transform = `rotate(${deg}deg)`;
-
-                for (let day = 0; day < 3; day++) {
-                    const am = data.properties.periods[day * 2];
-                    const pm = data.properties.periods[day * 2 + 1];
-
-                    const getStatus = (p) => {
-                        const wStr = p.windSpeed;
-                        const wN = parseInt(wStr.match(/\d+/)) || 0;
-                        const isW = ["W", "SW", "NW"].includes(p.windDirection);
-                        if (p.shortForecast.includes("Rain") || wN > 18) return { s:"stop", t:"In", i:"🏠", w: wStr };
-                        if ((isW && wN > 10) || wN > 13) return { s:"caution", t:"Rough", i:"🌊", w: wStr };
-                        return { s:"go", t:"Go", i:"🚤", w: wStr };
-                    };
-
-                    const amS = getStatus(am);
-                    const pmS = getStatus(pm);
-
-                    container.innerHTML += `
-                        <div class="day-container">
-                            <b style="font-size:0.85em; color:#007aff;">${am.name.split(' ')[0]}</b>
-                            <div class="timeline">
-                                <div class="time-slot"><span class="time-label">MORNING</span>${amS.i}<div class="wind-est">${amS.w}</div><span class="status-pill ${amS.s}">${amS.t}</span></div>
-                                <div class="time-slot"><span class="time-label">AFTERNOON</span>${pmS.i}<div class="wind-est">${pmS.w}</div><span class="status-pill ${pmS.s}">${pmS.t}</span></div>
-                                <div class="time-slot" style="opacity:0.6;"><span class="time-label">NIGHT</span>🌙<div class="wind-est">Calm</div><span class="status-pill go">Go</span></div>
-                            </div>
-                        </div>`;
-                }
-            } catch (e) { }
-        }
-
-        async function renderChart() {
-            const ctx = document.getElementById('depthChart');
-            const fmt = d => d.toISOString().split('T')[0];
-            const n = new Date(); const ly = new Date(); ly.setFullYear(n.getFullYear()-1);
-            const sn = new Date(); sn.setDate(n.getDate()-30);
-            const sl = new Date(ly); sl.setDate(ly.getDate()-30);
-            const fetchH = async (s, e) => {
-                const r = await fetch(`https://waterservices.usgs.gov/nwis/dv/?format=json&sites=${SITE_ID}&startDT=${s}&endDT=${e}&parameterCd=62615`);
-                const d = await r.json(); return d.value.timeSeries[0].values[0].value.map(v => parseFloat(v.value));
-            }
-            const dN = await fetchH(fmt(sn), fmt(n)); const dL = await fetchH(fmt(sl), fmt(ly));
-            new Chart(ctx, { type: 'line', data: { labels: Array.from({length:30}, (_, i)=>30-i), datasets: [{ label: 'Now', data: dN, borderColor: '#007aff', backgroundColor: '#007aff11', fill: true, tension: 0.3 }, { label: '2025', data: dL, borderColor: '#ccc', borderDash: [5,5], fill: false, tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { font: { size: 9 } } } } } });
-        }
-        init();
+        updateFishing(); getLakeData(); getWeatherData();
     </script>
 </body>
 </html>
