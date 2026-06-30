@@ -54,6 +54,10 @@
                 <div id="fishing-report"></div>
                 <a href="https://tpwd.texas.gov/fishboat/fish/action/reptform2.php?lake=EAGLE+MOUNTAIN" target="_blank" style="display:block; text-align:center; background:#007aff; color:white; text-decoration:none; padding:8px; border-radius:8px; font-size:0.8em; font-weight:bold; margin-top:10px;">📊 Full TPWD Report</a>
             </div>
+            <div class="card">
+                <h3>🌙 Bite Forecast</h3>
+                <div id="bite-forecast" style="font-size:0.8em; opacity:0.6; text-align:center; padding:10px 0;">Loading...</div>
+            </div>
             <div class="card" style="background: #fffbe6; border-color: #ffe58f;">
                 <h3>⚠️ Safety Checklist</h3>
                 <ul style="font-size: 0.75em; padding-left: 20px; margin: 5px 0; line-height: 1.6;">
@@ -120,6 +124,8 @@
         const USGS_SITE = "08045000";
         // NWS gridpoint for the FWD (Fort Worth/Dallas) office, covering Eagle Mountain Lake
         const NWS_GRID = "FWD/73,95";
+        // Approx center of Eagle Mountain Lake, used for moon/solunar/pressure lookups
+        const LAT = 32.92, LON = -97.44;
 
         function showError(msg) {
             const banner = document.getElementById('error-banner');
@@ -132,6 +138,7 @@
             updateFishing();
             await getLakeData();
             await getWeatherData();
+            await updateBiteForecast();
             await renderChart();
         }
 
@@ -308,6 +315,158 @@
                 showError("Couldn't load the 30-day chart history. " + e.message);
             }
         }
+        // --- Moon phase + solunar feeding windows (USNO Astronomical Applications API, free, no key) ---
+        const MOON_ICONS = {
+            "New Moon": "🌑", "Waxing Crescent": "🌒", "First Quarter": "🌓", "Waxing Gibbous": "🌔",
+            "Full Moon": "🌕", "Waning Gibbous": "🌖", "Last Quarter": "🌗", "Waning Crescent": "🌘"
+        };
+
+        function parseTimeToday(timeStr) {
+            // timeStr like "23:31" in the local tz we requested
+            if (!timeStr) return null;
+            const [h, m] = timeStr.split(":").map(Number);
+            const d = new Date();
+            d.setHours(h, m, 0, 0);
+            return d;
+        }
+
+        function minutesFromNow(d) {
+            if (!d) return Infinity;
+            return Math.abs((new Date() - d) / 60000);
+        }
+
+        async function getMoonAndSolunar() {
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            const tz = -now.getTimezoneOffset() / 60;
+            const res = await fetch(`https://aa.usno.navy.mil/api/rstt/oneday?date=${dateStr}&coords=${LAT},${LON}&tz=${tz}`);
+            if (!res.ok) throw new Error("USNO API failed: " + res.status);
+            const data = await res.json();
+            const d = data.properties.data;
+            const moonTimes = {};
+            (d.moondata || []).forEach(m => {
+                if (m.phen === "Rise") moonTimes.rise = m.time;
+                if (m.phen === "Set") moonTimes.set = m.time;
+                if (m.phen === "Upper Transit") moonTimes.upperTransit = m.time;
+                if (m.phen === "Lower Transit") moonTimes.lowerTransit = m.time;
+            });
+            const illum = parseInt(d.fracillum) || 0;
+            return {
+                phaseName: d.curphase,
+                icon: MOON_ICONS[d.curphase] || "🌗",
+                illumination: illum,
+                moonTimes
+            };
+        }
+
+        function getSolunarWindowStatus(moonTimes) {
+            const majorTimes = [parseTimeToday(moonTimes.upperTransit), parseTimeToday(moonTimes.lowerTransit)];
+            const minorTimes = [parseTimeToday(moonTimes.rise), parseTimeToday(moonTimes.set)];
+            const majorActive = majorTimes.some(t => minutesFromNow(t) <= 60); // ~1hr window around major periods
+            const minorActive = !majorActive && minorTimes.some(t => minutesFromNow(t) <= 30); // ~30min around minor periods
+            if (majorActive) return { active: true, label: "Major feeding period active now" };
+            if (minorActive) return { active: true, label: "Minor feeding period active now" };
+            return { active: false, label: "No major/minor period active right now" };
+        }
+
+        // --- Barometric pressure trend (NWS observation stations, free, no key) ---
+        async function getPressureTrend() {
+            const pointRes = await fetch(`https://api.weather.gov/points/${LAT},${LON}`);
+            if (!pointRes.ok) throw new Error("NWS points lookup failed");
+            const pointData = await pointRes.json();
+            const stRes = await fetch(pointData.properties.observationStations);
+            if (!stRes.ok) throw new Error("NWS station lookup failed");
+            const stData = await stRes.json();
+            const stationId = stData.features[0].properties.stationIdentifier;
+            const obsRes = await fetch(`https://api.weather.gov/stations/${stationId}/observations?limit=6`);
+            if (!obsRes.ok) throw new Error("NWS observations failed");
+            const obsData = await obsRes.json();
+            const pressures = obsData.features
+                .map(f => f.properties.barometricPressure && f.properties.barometricPressure.value)
+                .filter(v => v !== null && v !== undefined)
+                .reverse(); // oldest -> newest
+            if (pressures.length < 2) throw new Error("Not enough pressure readings");
+            const diffPa = pressures[pressures.length - 1] - pressures[0];
+            const diffInHg = diffPa * 0.0002953;
+            const currentInHg = pressures[pressures.length - 1] * 0.0002953;
+            let trend, icon;
+            if (diffInHg <= -0.03) { trend = "Falling"; icon = "📉"; }
+            else if (diffInHg >= 0.03) { trend = "Rising"; icon = "📈"; }
+            else { trend = "Steady"; icon = "➡️"; }
+            return { trend, icon, currentInHg };
+        }
+
+        // --- Composite Fish Activity Scale ---
+        function scoreMoon(moon) {
+            // Solunar theory: activity peaks near new/full moon (illumination near 0% or 100%)
+            return Math.max(0, 100 - Math.abs(moon.illumination - 50) * 2);
+        }
+        function scorePressure(pressureTrend) {
+            if (!pressureTrend) return 50;
+            if (pressureTrend.trend === "Falling") return 90;
+            if (pressureTrend.trend === "Steady") return 60;
+            return 30; // rising pressure tends to slow the bite
+        }
+        function scoreWindow(active) {
+            return active ? 100 : 40;
+        }
+        function getBiteRating(score) {
+            if (score >= 80) return { label: "Excellent", color: "#2c7a7b", bg: "#e6fffa" };
+            if (score >= 60) return { label: "Good", color: "#2b6cb0", bg: "#ebf8ff" };
+            if (score >= 40) return { label: "Fair", color: "#b7791f", bg: "#fffbe6" };
+            return { label: "Poor", color: "#c53030", bg: "#fff5f5" };
+        }
+
+        async function updateBiteForecast() {
+            const card = document.getElementById('bite-forecast');
+            let moon = null, windowStatus = { active: false, label: "Solunar data unavailable" }, pressureTrend = null;
+
+            try {
+                moon = await getMoonAndSolunar();
+                windowStatus = getSolunarWindowStatus(moon.moonTimes);
+            } catch (e) {
+                showError("Couldn't load moon/solunar data. " + e.message);
+            }
+
+            try {
+                pressureTrend = await getPressureTrend();
+            } catch (e) {
+                showError("Couldn't load pressure trend. " + e.message);
+            }
+
+            const moonScore = moon ? scoreMoon(moon) : 50;
+            const pressureScore = scorePressure(pressureTrend);
+            const windowScore = scoreWindow(windowStatus.active);
+            const overall = Math.round((moonScore + pressureScore + windowScore) / 3);
+            const rating = getBiteRating(overall);
+
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; gap:6px; margin-bottom:10px;">
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:1.8em;">${moon ? moon.icon : "❓"}</div>
+                        <div style="font-size:0.65em; font-weight:bold;">${moon ? moon.phaseName : "Unavailable"}</div>
+                        <div style="font-size:0.6em; opacity:0.6;">${moon ? moon.illumination + "% illum." : ""}</div>
+                    </div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:1.5em;">${pressureTrend ? pressureTrend.icon : "❓"}</div>
+                        <div style="font-size:0.65em; font-weight:bold;">${pressureTrend ? pressureTrend.trend : "Unavailable"}</div>
+                        <div style="font-size:0.6em; opacity:0.6;">${pressureTrend ? pressureTrend.currentInHg.toFixed(2) + " inHg" : ""}</div>
+                    </div>
+                    <div style="flex:1; text-align:center;">
+                        <div style="font-size:1.5em;">${windowStatus.active ? "🎣" : "⏳"}</div>
+                        <div style="font-size:0.6em; line-height:1.2;">${windowStatus.label}</div>
+                    </div>
+                </div>
+                <div style="background:${rating.bg}; color:${rating.color}; border-radius:8px; padding:10px; text-align:center;">
+                    <div style="font-size:0.6em; opacity:0.7; text-transform:uppercase; letter-spacing:0.5px;">Fish Activity Scale</div>
+                    <div style="font-size:1.4em; font-weight:800;">${rating.label}</div>
+                    <div style="background:#fff; border-radius:6px; height:8px; margin-top:6px; overflow:hidden;">
+                        <div style="background:${rating.color}; width:${overall}%; height:100%;"></div>
+                    </div>
+                </div>
+            `;
+        }
+
         init();
     </script>
 </body>
