@@ -17,6 +17,7 @@
         .status-pill { font-size: 0.65em; font-weight: bold; padding: 5px; border-radius: 4px; display: block; text-transform: uppercase; text-align: center; }
         .go { background: #e6fffa; color: #2c7a7b; }
         .stop { background: #fff5f5; color: #c53030; }
+        .warn { background: #fffbe6; color: #b7791f; }
 
         /* 3-Day Layout */
         .day-container { margin-bottom: 12px; background: #fff; border-radius: 10px; padding: 10px; border: 1px solid #edf2f7; }
@@ -37,12 +38,14 @@
         .fish-box { background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #3182ce; font-size: 0.8em; }
         .bait-tag { display: inline-block; background: #ebf8ff; color: #2b6cb0; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin: 2px; border: 1px solid #bee3f8; font-weight: bold; }
         .updated { font-size: 0.65em; opacity: 0.5; text-align: center; margin-bottom: 8px; }
+        .err { font-size: 0.65em; color: #c53030; text-align: center; margin-bottom: 8px; }
     </style>
 </head>
 <body>
 
     <h1 style="text-align: center; color: #1a202c; margin: 10px 0 5px 0; font-size: 1.4em;">Dean's Eagle Mountain Dashboard</h1>
     <div id="update-time" class="updated">Syncing Data...</div>
+    <div id="error-banner" class="err" style="display:none;"></div>
 
     <div class="container">
         <div class="column">
@@ -66,6 +69,7 @@
                 <div style="font-size: 0.65em; font-weight: bold; opacity: 0.6; text-align: center;">SURFACE ELEVATION</div>
                 <div id="lake-level" class="level">...</div>
                 <div id="lake-status" class="status-pill" style="max-width: 140px; margin: 0 auto; padding: 6px;">Checking...</div>
+                <div id="lake-as-of" class="updated" style="margin-top:6px;">As of: --</div>
             </div>
 
             <div class="card">
@@ -84,12 +88,13 @@
                 <h3>💨 Conditions</h3>
                 <div class="temp-grid">
                     <div class="temp-box"><span style="font-size:0.6em;display:block;opacity:0.6;">AIR</span><span id="air-temp" class="temp-val">--°</span></div>
-                    <div class="temp-box"><span style="font-size:0.6em;display:block;opacity:0.6;">WATER</span><span id="water-temp" class="temp-val">63°</span></div>
+                    <div class="temp-box"><span style="font-size:0.6em;display:block;opacity:0.6;">WATER</span><span id="water-temp" class="temp-val">--°</span></div>
                 </div>
                 <div id="wind-speed" style="font-size: 1.8em; font-weight: 800;">-- mph</div>
                 <div id="wind-dir" style="font-size: 0.75em; margin-bottom: 8px;">--</div>
                 <div id="wind-safety" class="status-pill">--</div>
-                
+                <div id="weather-as-of" class="updated" style="margin-top:6px;">As of: --</div>
+
                 <h4 style="font-size: 0.7em; margin: 15px 0 5px 0; color: #007aff; text-align: left;">24-HR WIND TREND</h4>
                 <div id="hourly-list" class="hourly-wind"></div>
             </div>
@@ -111,6 +116,17 @@
         const WIND_LIMIT = 12;
         const DOCK_LIMIT = 645.5;
         const MY_PHONE = "214-364-0262";
+        // USGS site 08045000 = Eagle Mtn Res abv Ft Worth, TX (verified correct gauge)
+        const USGS_SITE = "08045000";
+        // NWS gridpoint for the FWD (Fort Worth/Dallas) office, covering Eagle Mountain Lake
+        const NWS_GRID = "FWD/73,95";
+
+        function showError(msg) {
+            const banner = document.getElementById('error-banner');
+            banner.style.display = 'block';
+            banner.innerText = "⚠️ " + msg;
+            console.error(msg);
+        }
 
         async function init() {
             updateFishing();
@@ -121,87 +137,176 @@
 
         async function getLakeData() {
             try {
-                const res = await fetch('https://waterservices.usgs.gov/nwis/iv/?format=json&sites=08045000&parameterCd=62615');
+                const res = await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_SITE}&parameterCd=62615`);
+                if (!res.ok) throw new Error("USGS request failed: " + res.status);
                 const data = await res.json();
-                const level = parseFloat(data.value.timeSeries[0].values[0].value[0].value);
+                const series = data.value.timeSeries[0].values[0].value[0];
+                const level = parseFloat(series.value);
                 const levelStr = level.toFixed(2);
                 document.getElementById('lake-level').innerText = levelStr + ' ft';
-                document.getElementById('update-time').innerText = "Last Updated: " + new Date().toLocaleString();
-                
+                const obsTime = new Date(series.dateTime);
+                document.getElementById('lake-as-of').innerText = "As of: " + obsTime.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                document.getElementById('update-time').innerText = "Page checked: " + new Date().toLocaleString();
+
                 const ls = document.getElementById('lake-status');
                 ls.innerText = level > DOCK_LIMIT ? "DOCK IS SAFE" : "STAY AT DOCK";
                 ls.className = "status-pill " + (level > DOCK_LIMIT ? "go" : "stop");
 
                 const smsMsg = `Heading out on Eagle Mountain. Lake: ${levelStr} ft. Wind: ${document.getElementById('wind-speed').innerText}.`;
                 document.getElementById('float-plan').href = `sms:${MY_PHONE}?body=${encodeURIComponent(smsMsg)}`;
-            } catch(e) {}
+
+                // Try to grab water temperature too (USGS param 00010 = water temp, C). Not every site reports it.
+                try {
+                    const tRes = await fetch(`https://waterservices.usgs.gov/nwis/iv/?format=json&sites=${USGS_SITE}&parameterCd=00010`);
+                    const tData = await tRes.json();
+                    const tSeries = tData.value.timeSeries[0]?.values?.[0]?.value?.[0];
+                    if (tSeries) {
+                        const celsius = parseFloat(tSeries.value);
+                        const fahrenheit = Math.round(celsius * 9 / 5 + 32);
+                        document.getElementById('water-temp').innerText = fahrenheit + "°";
+                    } else {
+                        document.getElementById('water-temp').innerText = "N/A";
+                    }
+                } catch (tErr) {
+                    document.getElementById('water-temp').innerText = "N/A";
+                }
+            } catch (e) {
+                showError("Couldn't load lake level data (USGS). " + e.message);
+                document.getElementById('lake-level').innerText = "--";
+                document.getElementById('lake-status').innerText = "Data unavailable";
+            }
         }
 
         async function getWeatherData() {
             try {
-                const hRes = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast/hourly');
+                const hRes = await fetch(`https://api.weather.gov/gridpoints/${NWS_GRID}/forecast/hourly`);
+                if (!hRes.ok) throw new Error("NWS hourly forecast failed: " + hRes.status);
                 const hData = await hRes.json();
                 const periods = hData.properties.periods;
-                
+
                 const now = periods[0];
                 document.getElementById('air-temp').innerText = now.temperature + "°";
                 document.getElementById('wind-speed').innerText = now.windSpeed;
                 document.getElementById('wind-dir').innerText = "From the " + now.windDirection;
-                
+
+                const forecastGenerated = hData.properties.updateTime || hData.properties.generatedAt;
+                if (forecastGenerated) {
+                    document.getElementById('weather-as-of').innerText = "As of: " + new Date(forecastGenerated).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                }
+
                 const curW = parseInt(now.windSpeed.match(/\d+/)) || 0;
                 const ws = document.getElementById('wind-safety');
                 ws.innerText = curW >= WIND_LIMIT ? "STAY AT HOME" : "SAFE TO BOAT";
                 ws.className = "status-pill " + (curW >= WIND_LIMIT ? "stop" : "go");
 
                 let hHtml = "";
-                for(let i=1; i<=24; i++){
+                for (let i = 1; i <= 24 && i < periods.length; i++) {
                     const p = periods[i];
                     const wVal = parseInt(p.windSpeed.match(/\d+/)) || 0;
                     const style = wVal >= WIND_LIMIT ? 'color:#e53e3e;font-weight:bold;' : '';
-                    hHtml += `<div class="wind-line"><span>${new Date(p.startTime).toLocaleTimeString([], {hour:'numeric'})}</span><span style="${style}">${p.windSpeed}</span></div>`;
+                    hHtml += `<div class="wind-line"><span>${new Date(p.startTime).toLocaleTimeString([], {hour: 'numeric'})}</span><span style="${style}">${p.windSpeed}</span></div>`;
                 }
                 document.getElementById('hourly-list').innerHTML = hHtml;
 
-                const dRes = await fetch('https://api.weather.gov/gridpoints/FWD/73,95/forecast');
-                const dData = await dRes.json();
+                // Build a real AM / PM / EVE breakdown per day from the hourly data,
+                // instead of faking the evening slot.
+                const buckets = {}; // dateStr -> { AM: [], PM: [], EVE: [] }
+                periods.forEach(p => {
+                    const dt = new Date(p.startTime);
+                    const dateStr = dt.toDateString();
+                    const hour = dt.getHours();
+                    let bucket;
+                    if (hour >= 6 && hour < 12) bucket = "AM";
+                    else if (hour >= 12 && hour < 18) bucket = "PM";
+                    else bucket = "EVE";
+                    if (!buckets[dateStr]) buckets[dateStr] = { AM: [], PM: [], EVE: [] };
+                    const w = parseInt(p.windSpeed.match(/\d+/)) || 0;
+                    buckets[dateStr][bucket].push(w);
+                });
+
                 const container = document.getElementById('v12-forecast');
-                for(let day=0; day<3; day++) {
-                    const am = dData.properties.periods[day*2];
-                    const pm = dData.properties.periods[day*2+1];
-                    const getSlot = (name, p) => {
-                        const wStr = p ? p.windSpeed : "8 mph"; 
-                        const wN = parseInt(wStr.match(/\d+/)) || 0;
-                        const s = wN >= WIND_LIMIT ? "stop" : "go";
-                        const ico = wN >= WIND_LIMIT ? "🏠" : "🚤";
-                        return `<div class="slot"><span class="slot-name">${name}</span><span class="slot-icon">${ico}</span><b>${wStr}</b></div>`;
+                container.innerHTML = "";
+                const dateKeys = Object.keys(buckets).slice(0, 3);
+                dateKeys.forEach(dateStr => {
+                    const dayName = new Date(dateStr).toLocaleDateString([], { weekday: 'long' });
+                    const getSlot = (name, windArr) => {
+                        if (!windArr.length) return `<div class="slot"><span class="slot-name">${name}</span><span class="slot-icon">–</span><b>N/A</b></div>`;
+                        const maxW = Math.max(...windArr);
+                        const s = maxW >= WIND_LIMIT ? "stop" : "go";
+                        const ico = maxW >= WIND_LIMIT ? "🏠" : "🚤";
+                        return `<div class="slot"><span class="slot-name">${name}</span><span class="slot-icon">${ico}</span><b>${maxW} mph</b></div>`;
                     };
-                    container.innerHTML += `<div class="day-container"><span class="day-label">${am.name.split(' ')[0]}</span><div class="timeline-v12">${getSlot("AM", am)}${getSlot("PM", pm)}${getSlot("EVE", null)}</div></div>`;
-                }
-            } catch(e) {}
+                    container.innerHTML += `<div class="day-container"><span class="day-label">${dayName}</span><div class="timeline-v12">${getSlot("AM", buckets[dateStr].AM)}${getSlot("PM", buckets[dateStr].PM)}${getSlot("EVE", buckets[dateStr].EVE)}</div></div>`;
+                });
+            } catch (e) {
+                showError("Couldn't load weather data (NWS). " + e.message);
+                document.getElementById('wind-speed').innerText = "--";
+                document.getElementById('wind-safety').innerText = "Data unavailable";
+            }
+        }
+
+        // Seasonal Eagle Mountain Lake fishing patterns by month.
+        // Source: general TX largemouth/crappie/catfish/white bass seasonal behavior.
+        // The TPWD link below the card always has the latest official survey if you want to verify.
+        function getSeasonalFishReport() {
+            const month = new Date().getMonth(); // 0 = Jan
+
+            const winter = [
+                { n: "Largemouth Bass", p: "Holding deep near channel drops and bluff ends; slow, vertical presentations work best.", b: ["Jigging Spoons", "Football Jigs"] },
+                { n: "Blue Catfish", p: "Stacked deep in the river channel; bite slows but quality fish still caught on bait soaked near structure.", b: ["Cut Shad", "Punch Bait"] },
+                { n: "Crappie", p: "Suspended deep near brush piles and bridge pilings.", b: ["Tube Jigs", "Minnows"] },
+                { n: "White Bass", p: "Schooled deep in the main lake, less active until pre-spawn warm-up begins.", b: ["Slabs", "Spoons"] }
+            ];
+            const preSpawn = [
+                { n: "Largemouth Bass", p: "Staging on points and creek mouths ahead of the spawn, feeding heavily as water warms.", b: ["Bladed Jigs", "Crankbaits"] },
+                { n: "White Bass", p: "Running upriver toward spawning grounds; strong numbers near the river mouth.", b: ["Beetle Spins", "Small Jigs"] },
+                { n: "Crappie", p: "Moving shallow toward docks and brush as water nears the mid-60s.", b: ["Jigs", "Minnows"] },
+                { n: "Blue Catfish", p: "Becoming more active in mid-depth flats as water warms.", b: ["Cut Bait", "Punch Bait"] }
+            ];
+            const spawnSummer = [
+                { n: "Largemouth Bass", p: "Bedding in shallow coves in spring, sliding to deeper structure and shade by summer.", b: ["Soft Plastics", "Topwater (early/late)"] },
+                { n: "Crappie", p: "Spawning around docks and shallow brush, then pushing back to deeper cover as it heats up.", b: ["Jigs", "Minnows"] },
+                { n: "Blue Catfish", p: "Very active in shallow flats and flooded timber during the warm months.", b: ["Cut Shad", "Live Bait"] },
+                { n: "White Bass", p: "Schooling and feeding on shad on the surface during summer, especially early morning.", b: ["Topwater", "Slabs"] }
+            ];
+            const fall = [
+                { n: "Largemouth Bass", p: "Following shad schools into creeks and coves as water cools; feeding aggressively.", b: ["Crankbaits", "Spinnerbaits"] },
+                { n: "White Bass", p: "Schooling on the surface chasing shad, especially mornings and evenings.", b: ["Topwater", "Beetle Spins"] },
+                { n: "Crappie", p: "Moving back shallow around docks and timber as water temps drop.", b: ["Jigs", "Minnows"] },
+                { n: "Blue Catfish", p: "Feeding heavily to bulk up before winter; active across depths.", b: ["Cut Bait", "Shad"] }
+            ];
+
+            // Dec-Feb: winter | Mar-Apr: pre-spawn | May-Aug: spawn/summer | Sep-Nov: fall
+            if (month === 11 || month === 0 || month === 1) return { season: "Winter", reports: winter };
+            if (month === 2 || month === 3) return { season: "Pre-Spawn", reports: preSpawn };
+            if (month >= 4 && month <= 7) return { season: "Spawn / Summer", reports: spawnSummer };
+            return { season: "Fall", reports: fall };
         }
 
         function updateFishing() {
-            const reports = [
-                { n: "Largemouth Bass", p: "Staging on spawning beds in shallow water. Feeding heavily.", b: ["Bladed Jigs", "Crankbaits"] },
-                { n: "Blue Catfish", p: "Excellent action in shallow water as they move to spring patterns.", b: ["Cut Bait"] },
-                { n: "White Bass", p: "Staging at river mouth and running upriver. High numbers reported.", b: ["Beetle Spins"] },
-                { n: "Crappie", p: "Moving into pre-spawn patterns around boat docks and slips.", b: ["Jigs", "Minnows"] }
-            ];
-            document.getElementById('fishing-report').innerHTML = reports.map(f => `<div class="fish-box"><strong>${f.n}</strong><br>${f.p}<br>${f.b.map(bt => `<span class="bait-tag">${bt}</span>`).join('')}</div>`).join('');
+            const { season, reports } = getSeasonalFishReport();
+            document.getElementById('fishing-report').innerHTML =
+                `<div style="font-size:0.7em; font-weight:bold; color:#3182ce; margin-bottom:6px;">${season} Pattern — based on ${new Date().toLocaleDateString([], {month:'long', year:'numeric'})}</div>` +
+                reports.map(f => `<div class="fish-box"><strong>${f.n}</strong><br>${f.p}<br>${f.b.map(bt => `<span class="bait-tag">${bt}</span>`).join('')}</div>`).join('');
         }
 
         async function renderChart() {
-            const ctx = document.getElementById('depthChart');
-            const fmt = d => d.toISOString().split('T')[0];
-            const n = new Date(); const ly = new Date(); ly.setFullYear(n.getFullYear()-1);
-            const sn = new Date(); sn.setDate(n.getDate()-30);
-            const sl = new Date(ly); sl.setDate(ly.getDate()-30);
-            const fetchH = async (s, e) => {
-                const r = await fetch(`https://waterservices.usgs.gov/nwis/dv/?format=json&sites=08045000&startDT=${s}&endDT=${e}&parameterCd=62615`);
-                const d = await r.json(); return d.value.timeSeries[0].values[0].value.map(v => parseFloat(v.value));
+            try {
+                const ctx = document.getElementById('depthChart');
+                const fmt = d => d.toISOString().split('T')[0];
+                const n = new Date(); const ly = new Date(); ly.setFullYear(n.getFullYear() - 1);
+                const sn = new Date(); sn.setDate(n.getDate() - 30);
+                const sl = new Date(ly); sl.setDate(ly.getDate() - 30);
+                const fetchH = async (s, e) => {
+                    const r = await fetch(`https://waterservices.usgs.gov/nwis/dv/?format=json&sites=${USGS_SITE}&startDT=${s}&endDT=${e}&parameterCd=62615`);
+                    if (!r.ok) throw new Error("USGS history failed: " + r.status);
+                    const d = await r.json(); return d.value.timeSeries[0].values[0].value.map(v => parseFloat(v.value));
+                }
+                const dN = await fetchH(fmt(sn), fmt(n)); const dL = await fetchH(fmt(sl), fmt(ly));
+                new Chart(ctx, { type: 'line', data: { labels: Array.from({ length: 30 }, (_, i) => 30 - i), datasets: [{ label: 'Now', data: dN, borderColor: '#007aff', backgroundColor: '#007aff11', fill: true, tension: 0.3 }, { label: '2025', data: dL, borderColor: '#ccc', borderDash: [5, 5], fill: false, tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { font: { size: 9 } } } } } });
+            } catch (e) {
+                showError("Couldn't load the 30-day chart history. " + e.message);
             }
-            const dN = await fetchH(fmt(sn), fmt(n)); const dL = await fetchH(fmt(sl), fmt(ly));
-            new Chart(ctx, { type: 'line', data: { labels: Array.from({length:30}, (_,i)=>30-i), datasets: [{ label: 'Now', data: dN, borderColor: '#007aff', backgroundColor: '#007aff11', fill: true, tension: 0.3 }, { label: '2025', data: dL, borderColor: '#ccc', borderDash: [5,5], fill: false, tension: 0.3 }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { font: { size: 9 } } } } } });
         }
         init();
     </script>
